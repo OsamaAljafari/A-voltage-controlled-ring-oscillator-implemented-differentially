@@ -1,0 +1,858 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{hyperref}
+
+% Document Metadata
+\title{Design and Simulation of a Discrete Differential Ring Oscillator used in FM modulation}
+\author{Osama Aljafari , Yousef Dweik\\ Student IDs (respectively) : U23101132, U23101485, U23104255  \\ Analog Integrated Circuits}
+\date{April 6, 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report presents the design, simulation, and characterization of a three-stage differential ring oscillator implemented as a voltage-controlled oscillator (VCO) using discrete 2N7000 N-channel MOSFET transistors. The circuit employs nine transistors: six forming three differential pair stages and three operating as tail current sources whose bias voltage serves as the frequency control input. Simulations were carried out in Cadence PSPICE. Systematic component optimization yielded a tuning range of approximately 21 kHz (75.4-96.3 kHz) over a control voltage window of 2.3-2.8 V with a 5 V supply. Phase noise was estimated from high-resolution FFT analysis, yielding $\mathcal{L}(1~kHz)\approx-73~dBc/Hz$, consistent with theoretical expectations for a resistively-loaded ring oscillator. FM modulation was demonstrated by applying a 1 kHz sinusoidal signal to the control input, producing clearly visible Bessel-function sidebands in the frequency spectrum.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduction}
+Voltage-controlled oscillators (VCOs) are fundamental building blocks in analog and mixed-signal systems, finding application in phase-locked loops (PLLs), frequency synthesizers, clock generation circuits, and FM transmitters. A ring oscillator VCO achieves frequency control by modulating the propagation delay of each inverting stage through a control voltage, making it compact and naturally suited to wide tuning ranges.
+
+Among ring oscillator topologies, the differential (current-mode logic, CML) variant offers significant advantages over single-ended designs: superior common-mode noise rejection, and a direct relationship between tail current and oscillation frequency that enables precise voltage control. This project implements a three-stage differential ring oscillator using discrete 2N7000 enhancement-mode N-channel MOSFETs on a 5 V supply.
+
+\section{Ring Oscillator Theory}
+\subsection{Barkhausen Criterion}
+A ring oscillator sustains oscillation when the Barkhausen criterion is satisfied:
+the total loop gain must equal unity and the total loop phase shift must equal
+$2\pi$ (or an integer multiple thereof). In a ring of $N$ inverting stages, each
+stage contributes $\pi$ radians of phase inversion. For the total phase shift to
+equal $2\pi$, the signal must propagate through the ring twice, meaning the
+oscillation period equals twice the total propagation delay around the ring.
+
+\begin{equation}
+T = 2Nt_{d}
+\end{equation}
+where $t_d$ is the propagation delay of a single stage and $N$ is the number of
+stages. Consequently the oscillation frequency is:
+
+
+\[
+f_0 = \frac{1}{2N t_d}
+\tag{2}
+\]
+
+
+For a stage with resistive load $R$ and capacitance $C$, the stage delay is
+approximately $t_d \approx RC \ln 2$, giving:
+
+
+\[
+f_0 \approx \frac{1}{2N RC \ln 2}
+\]
+
+\subsection{Why an Odd Number of Stages is Required}
+
+A single-ended ring oscillator requires an odd number of stages to guarantee an
+odd total number of inversions, satisfying the Barkhausen phase condition. With
+an even number of stages the loop has zero net inversion and simply latches to a
+stable DC state.
+
+The differential ring oscillator relaxes this constraint. Because each differential
+stage produces both the signal and its complement, the required inversion can be
+introduced by swapping the differential connections between stages rather than by
+adding an extra stage. This allows an even number of stages to oscillate if one
+inter-stage connection is swapped. In this design, three stages are used with one
+swapped feedback connection, satisfying the phase condition.
+
+
+
+\subsection{Differential Ring Oscillator Operation}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\linewidth]{photo1.png}
+    \caption{PSPICE schematic of the three-stage differential ring oscillator VCO}
+    \label{fig:schematic}
+\end{figure}
+
+
+Each stage $i$ consists of a differential pair $(M_{2i-1}/M_{2i})$, resistive loads
+$R_{2i-1}/R_{2i}$, load capacitors $C_{2i-1}/C_{2i}$, and a tail current source
+$(M_{6+i})$.
+
+The signal propagates from stage 1 to stage 2 to stage 3, with the output of stage 3
+fed back to the input of stage 1 with the connections swapped, introducing the
+required net inversion. Each traversal of the three stages inverts the signal; two
+traversals complete a full $2\pi$ phase shift, sustaining oscillation.
+
+\subsection{Voltage-Controlled Operation and Current Starving}
+
+The oscillation frequency of a differential ring oscillator can be expressed in terms of
+the tail current $I_{\text{tail}}$ and load capacitance $C$:
+
+
+\[
+f_0 = \frac{I_{\text{tail}}}{2 N C \, \Delta V}
+\tag{4}
+\]
+
+
+where $\Delta V$ is the differential output voltage swing. The frequency is directly
+proportional to the tail current. Since the tail transistors (M7--M9) operate in saturation,
+their drain current follows:
+
+
+\[
+I_{\text{tail}} = \frac{K_P}{2} (V_{\text{ctrl}} - V_{TO})^2
+\]
+
+
+
+Substituting into equation (4):
+
+
+\[
+f_0 = \frac{K_P (V_{\text{ctrl}} - V_{TO})^2}{4 N C \, \Delta V}
+\tag{5}
+\]
+
+
+
+The frequency varies as the square of the overdrive voltage $(V_{\text{ctrl}} - V_{TO})$,
+meaning the VCO is most sensitive to $V_{\text{ctrl}}$ near threshold and becomes
+progressively less sensitive as $V_{\text{ctrl}}$ increases. This is confirmed by the
+measured tuning curve in Section 5.
+
+The small-signal VCO gain $K_{\text{VCO}}$ (Hz/V) is:
+
+
+\[
+K_{\text{VCO}} = \frac{\partial f_0}{\partial V_{\text{ctrl}}}
+= \frac{K_P (V_{\text{ctrl}} - V_{TO})}{2 N C \, \Delta V}
+\tag{7}
+\]
+
+
+
+$K_{\text{VCO}}$ is highest near threshold and decreases as $V_{\text{ctrl}}$ increases,
+explaining the nonlinear tuning curve observed in simulation.
+
+
+\subsection{Comparison with Single-Ended Ring Oscillators}
+
+Table~\ref{tab:comparison_ring_oscillators} summarizes the key differences between
+single-ended and differential ring oscillator topologies.
+
+\begin{table}[h]
+    \centering
+    \caption{Comparison of single-ended and differential ring oscillators.}
+    \label{tab:comparison_ring_oscillators}
+    \begin{tabular}{lcc}
+        \hline
+        \textbf{Property} & \textbf{Single-Ended} & \textbf{Differential} \\
+        \hline
+        Minimum stages & 3 (must be odd) & 2 (even allowed with swap) \\
+        Supply noise rejection & Poor & Excellent (CMRR) \\
+        Output swing & Rail-to-rail & Limited by $I_{\text{tail}} \cdot R$ \\
+        Frequency control & Via $V_{DD}$ or load & Via tail current \\
+        Power consumption & Lower & Higher (tail current always on) \\
+        Phase noise & Worse & Better (differential cancellation) \\
+        \hline
+    \end{tabular}
+\end{table}
+\subsection{Loop Gain and Start-Up Analysis (Highly optional)}
+ 
+To complement the large-signal frequency analysis of Section~2.4, we examine the
+small-signal transfer function to establish the start-up condition and
+verify the feedback polarity of the topology.
+ 
+\paragraph{Transfer function.}
+Breaking the feedback path at the input of stage~1 and modelling each differential
+pair as a linear transconductor with transconductance $g_m$ driving the parallel
+combination of load resistor $R$ and load capacitor $C$, the small-signal voltage
+gain of a single stage from differential input to differential output is
+%
+\begin{equation}
+    A(j\omega) = \frac{-g_m R}{1 + j\omega RC}.
+    \label{eq:stage_gain}
+\end{equation}
+%
+Cascading three such stages and accounting for the additional sign inversion
+introduced by the swapped feedback connection, the four sign changes---three from
+the inverting differential pairs and one from the swap---cancel, yielding a net
+positive transfer function:
+%
+\begin{equation}
+    T(j\omega) = \left(\frac{g_m R}{1 + j\omega RC}\right)^3.
+    \label{eq:loop_gain}
+\end{equation}
+ 
+\paragraph{Phase condition and relaxation regime.}
+The phase of $T(j\omega)$ is
+%
+\begin{equation}
+    \angle T(j\omega) = -3\arctan(\omega RC),
+\end{equation}
+%
+which decreases monotonically from $0^\circ$ at $\omega = 0$ toward
+$-270^\circ$ as $\omega \to \infty$.
+Because the phase never reaches $-360^\circ$, the classical Barkhausen sinusoidal
+oscillation condition is not satisfied at any finite frequency within the
+linear small-signal model.
+This is a fundamental property of differential CML ring oscillators: in contrast
+to single-ended three-stage rings.
+Oscillation frequency is consequently governed by the large-signal
+current-starving mechanism of Equation~(4):
+%
+\begin{equation*}
+    f_0 = \frac{I_{\mathrm{tail}}}{2NC\Delta V},
+\end{equation*}
+%
+which correctly predicts the tuning behaviour measured in Section~5.
+ 
+\paragraph{Gain condition and start-up.}
+Although the small-signal analysis does not predict the oscillation frequency, it
+correctly predicts the \emph{start-up condition}. At DC, the loop gain magnitude
+is $|T(0)| = (g_m R)^3$. For the circuit to escape its stable DC fixed point and
+enter self-sustaining oscillation, positive feedback must dominate, requiring
+%
+\begin{equation}
+    g_m R > 1,
+    \label{eq:startup}
+\end{equation}
+%
+where $g_m$ is evaluated at the quiescent operating point of the differential pair
+transistors. This condition is satisfied with comfortable margin across the entire
+control voltage tuning window of $2.3$--$2.8\,\mathrm{V}$.
+ 
+
+\section{Circuit Topology}
+\subsection{Differential Pair Stages}
+
+Each of the three stages is formed by a differential pair (M1/M2, M3/M4, M5/M6). The
+outputs are cross-coupled so that the output of each stage drives the input of the next
+with the correct polarity, with one swapped connection at the feedback path to introduce
+the required net inversion. Load resistors R1--R6 (2\,k\(\Omega\)) set the DC operating
+point and, together with load capacitors C1--C6 (2.2\,nF), define the RC time constant
+that alongside the tail current governs the oscillation frequency.
+
+
+\subsection{Tail Current Sources}
+
+Transistors M7, M8, and M9 operate in saturation as tail current sources. Their gates are
+tied together to the control voltage $V_{\text{ctrl}}$. Varying $V_{\text{ctrl}}$ modulates the
+tail current through all three stages simultaneously, changing the switching speed of the
+differential pairs and therefore the oscillation frequency.
+
+
+\subsection{Supply and Bias}
+
+The circuit operates from a single 5V supply. The control voltage $V_{\text{ctrl}}$ must
+exceed the 2N7000 threshold voltage ($V_{TO} = 2.236\text{ V}$) to keep the tail
+transistors in saturation and supply sufficient current for sustained oscillation.
+
+
+\section{Component Value Optimization}
+\subsection{Design Iterations}
+
+The key tension in the design is between RC-dominated delay and current-dominated
+delay. When $R$ is large, the RC time constant dominates equation (3) and the tail
+current has little influence on frequency. When $R$ is very small, the capacitor dominates
+the current-based delay of equation (4). The optimal design point occurs where both
+mechanisms contribute comparably, maximizing sensitivity to $V_{\text{ctrl}}$. The IC version has an advantage over the discrete in this regard, since the capacitor is of incredibly small value, such that $RC$ is small and allows for tail current to offer a wide range ($500$ MHz - $1.4$ GHz)
+
+Table~\ref{tab:design_iterations} summarizes the key results.
+
+\begin{table}[h]
+    \centering
+    \caption{Summary of component optimization iterations ($V_{DD} = 5\text{ V}$, $V_{\text{ctrl}}$ swept 2.3--2.8 V).}
+    \label{tab:design_iterations}
+    \begin{tabular}{cccc}
+        \hline
+        \textbf{R (k}\(\Omega\)\textbf{)} &
+        \textbf{C (nF)} &
+        \textbf{Freq. Range (kHz)} &
+        \textbf{Tuning Range (kHz)} \\
+        \hline
+        33   & 0.15 & 75.4--96.3  & 20.9 \\
+        10   & 2    & 75.9--83.8  & 7.9  \\
+        1    & 3.3  & 75.4--96.3  & 20.9 \\
+        0.47 & 2.2  & 75.9--83.8  & 7.9  \\
+        4.7  & 1.0  & 119.9--134.0 & 14.1 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+
+\subsection{Effect of Supply Voltage}
+
+Increasing the supply to 9V approximately doubled the oscillation frequency to
+$\sim 180\text{ kHz}$ but reduced the tuning range to only 4.4\text{ kHz}, because the
+higher supply pushes the tail transistors deeper into saturation where $f_0$ is less
+sensitive to $V_{\text{ctrl}}$. The 5V supply was confirmed as optimal.
+
+\subsection{Tail Current Source Modifications}
+
+Parallel tail transistors and source degeneration resistors were also investigated. Parallel
+transistors alone reduced the tuning range to $\sim 6\text{ kHz}$ by supplying excess current,
+pushing the circuit into the RC-dominated regime. Source degeneration alone reduced the
+tuning range to 16.1\text{ kHz} by linearizing but desensitizing the tail current response.
+Neither modification improved upon the original single undegenerated tail transistor,
+which was retained as the optimal configuration.
+
+\section{VCO Characterization Results}
+\subsection{2.12 \; Tuning Curve}
+
+Table~\ref{tab:tuning_curve} presents the measured oscillation frequency as a function of
+control voltage for the final design ($R = 2\text{ k}\Omega$, $C = 2.2\text{ nF}$, $V_{DD} = 5\text{ V}$).
+
+\begin{table}[h]
+    \centering
+    \caption{VCO tuning curve: oscillation frequency vs.\ control voltage.}
+    \label{tab:tuning_curve}
+    \begin{tabular}{cc}
+        \hline
+        \textbf{$V_{\text{ctrl}}$ (V)} & \textbf{Frequency (kHz)} \\
+        \hline
+        2.3 & 75.4 \\
+        2.4 & 93.8 \\
+        2.5 & 95.3 \\
+        2.6 & 95.8 \\
+        2.7 & 96.1 \\
+        2.8 & 96.3 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+The tuning curve confirms the quadratic dependence predicted by equation (6): the
+frequency rises sharply near threshold (2.3--2.4\,V) and saturates as $V_{\text{ctrl}}$
+increases. The VCO gain in the most sensitive region is:
+
+
+\[
+K_{\text{VCO}} = \frac{93.8 - 75.4 \text{ kHz}}{2.4 - 2.3 \text{ V}}
+= 184 \text{ kHz/V}.
+\]
+
+The VCO gain in the most sensitive region is:
+\begin{equation}
+K_{VCO} = \frac{93.8 - 75.4~kHz}{2.4 - 2.3~V} = 184~kHz/V
+\end{equation}
+
+\subsection{Steady-State FFT}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\linewidth]{photo2.png}
+    \caption{Steady-state FFT of the VCO output. Dominant spike at ∼90kHz with noise floor below −85dB}
+    \label{fig:schematic}
+\end{figure}
+
+
+A single dominant spike is visible at approximately 90\,kHz with a flat noise floor
+below $-85$\,dB, confirming clean, stable oscillation.
+
+\section{Phase Noise Analysis (Important yet Optional Reading)}
+\subsection{Theoretical Background}
+
+An ideal oscillator produces a perfect sinusoid at exactly $f_0$, represented as an
+infinitely thin spike in the frequency domain. In practice, thermal noise in the resistive
+loads and active devices causes random fluctuations in the instantaneous phase of the
+oscillator, broadening the spectral line into a characteristic noise skirt. Phase noise
+$L(f_m)$ quantifies the single-sideband power spectral density of these phase fluctuations
+at an offset $f_m$ from the carrier, normalized to the carrier power:
+
+
+\[
+L(f_m) = 10 \log_{10}
+\left(
+\frac{P_{\text{sideband}}(f_0 + f_m, 1\text{ Hz})}{P_{\text{carrier}}}
+\right)
+\quad \text{[dBc/Hz]}.
+\]
+
+
+
+\subsubsection*{Leeson’s Model}
+
+The classical model for oscillator phase noise is due to Leeson (1966):
+
+
+\[
+L(f_m) = 10 \log_{10}
+\left[
+\frac{2 F k T}{P_s}
+\left(
+1 + \frac{f_0^2}{4 Q^2 f_m^2}
+\right)
+\left(
+1 + \frac{f_{1/f}}{f_m}
+\right)
+\right]
+\tag{9}
+\]
+
+
+
+where $F$ is the effective noise figure of the active devices, $k$ is Boltzmann’s constant,
+$T$ is absolute temperature, $P_s$ is the signal power, $Q$ is the loaded quality factor,
+and $f_{1/f}$ is the flicker noise corner frequency.
+
+For a ring oscillator there is no high-$Q$ resonator; the effective quality factor is
+approximately $Q \approx 0.5$ to $1$. This is the fundamental reason ring oscillators
+exhibit substantially worse phase noise than LC oscillators ($Q = 10$--$100$) or crystal
+oscillators ($Q = 10^4$--$10^6$).
+
+
+\subsection{Dominant Noise Sources}
+
+In the differential ring oscillator, the primary contributors to phase noise are:
+
+\begin{enumerate}
+    \item Thermal noise of load resistors R1--R6. Each 2\,k\(\Omega\) resistor contributes
+    Johnson noise
+    
+
+\[
+    S_v = 4 k T R \approx 3.3 \times 10^{-17} \, \text{V}^2/\text{Hz}
+    \quad (\approx -164.8 \, \text{dBV}^2/\text{Hz})
+    \]
+
+
+    at $T = 300\,$K.
+
+    \item Channel thermal noise of M1--M6. The differential pair transistors contribute
+    drain current noise
+    
+
+\[
+    S_{id} = 4 k T \gamma g_m,
+    \]
+
+
+    where $\gamma \approx \tfrac{2}{3}$ for long-channel MOSFETs. This noise appears
+    directly at the output nodes.
+
+    \item Channel thermal noise of M7--M9. Noise in the tail current directly modulates
+    $I_{\text{tail}}$ and therefore, via equation (4), directly modulates the instantaneous
+    oscillation frequency. This is typically the dominant contributor in current-starved
+    ring oscillators.
+
+    \item Flicker (1/f) noise of M7--M9. At low offset frequencies, flicker noise in the
+    tail transistors dominates.
+\end{enumerate}
+
+The differential topology partially mitigates contributions (1) and (2) through common-mode
+rejection (CMRR), since correlated noise on both sides of the differential pair partially
+cancels at the output. Contribution (3) is not rejected by the differential structure because
+tail current noise is a common-mode disturbance that equally affects both sides of each pair.
+
+
+\subsection{FFT-Based Phase Noise Estimation}
+
+Cadence PSPICE does natively support a method of accurate phase analysis. However, it is genuinely difficult to use and would be out of scope. Phase noise was estimated
+from a high-resolution FFT obtained from a long transient simulation with a fine time
+step to resolve the noise floor:
+
+\begin{verbatim}
+.tran 0 500m 50m
+.options maxstep=100n
+\end{verbatim}
+
+\noindent\textit{Listing 1: Simulation directives for phase noise FFT.}
+
+A 500\,ms simulation window gives an FFT bin width of:
+
+
+\[
+\Delta f = \frac{1}{T_{\text{sim}}}
+= \frac{1}{0.5 \, \text{s}}
+= 2 \, \text{Hz}
+\tag{11}
+\]
+
+
+
+Raw FFT values (in dB) must be normalized to dBc/Hz by subtracting
+$10 \log_{10}(\Delta f) = 10 \log_{10}(2) \approx 3 \, \text{dB}$.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\linewidth]{photo3.png}
+    \caption{High resolution FFT for phase noise via inspection}
+    \label{fig:schematic}
+\end{figure}
+
+
+Reading sideband levels from Figure~3 and applying the normalization correction:
+
+
+
+\[
+L(1\text{ kHz}) \approx -70\text{ dB} - 3\text{ dB}
+= -73\text{ dBc/Hz}
+\]
+
+
+
+
+
+\[
+L(10\text{ kHz}) \approx -95\text{ dB} - 3\text{ dB}
+= -98\text{ dBc/Hz}
+\]
+
+
+
+\subsection{Phase Noise Slope and Interpretation}
+
+The phase noise roll-off between 1\,kHz and 10\,kHz offsets is:
+
+
+\[
+\text{Slope} =
+\frac{-98 - (-73)}{1 \, \text{decade}}
+= -25 \, \text{dB/decade}
+\tag{12}
+\tag{13}
+\tag{14}
+\]
+
+
+
+This is close to the theoretical $-20$\,dB/decade ($1/f_m^2$) slope predicted by Leeson’s
+model in the thermally dominated region, with the slight excess attributable to residual
+flicker noise from the tail transistors at these offset frequencies.
+
+Table~\ref{tab:phase_noise_comparison} places these results in context.
+
+\begin{table}[h]
+    \centering
+    \caption{Phase noise comparison across oscillator topologies at 1\,kHz offset.}
+    \label{tab:phase_noise_comparison}
+    \begin{tabular}{lcc}
+        \hline
+        \textbf{Oscillator Type} & \textbf{Typical Q} & \textbf{$L(1\text{ kHz})$ (dBc/Hz)} \\
+        \hline
+        Crystal oscillator      & $10^4$--$10^6$ & $-140$ to $-160$ \\
+        LC oscillator           & $10$--$100$    & $-120$ to $-140$ \\
+        Typical ring oscillator & $<1$           & $-70$ to $-90$   \\
+        This design             & $<1$           & $-73$            \\
+        \hline
+    \end{tabular}
+\end{table}
+
+The measured $-73$\,dBc/Hz at 1\,kHz offset is fully consistent with expectations for a
+discrete resistively loaded ring oscillator. The $\sim 50$\,dB penalty relative to an LC
+oscillator arises from the inherently low quality factor of the ring topology (technically, the lack of a high-$Q$ resonating element causes this)
+\subsection{Impulse Sensitivity Function: Beyond Leeson's Model (Highly optional)}
+ 
+Leeson's model, applied in Sections~6.2--6.5, provides a useful closed-form
+estimate of phase noise but carries a fundamental limitation: the effective noise
+figure $F$ is a phenomenological parameter that must be fitted empirically rather
+than derived from circuit parameters. A more rigorous framework due to
+Hajimiri and Lee replaces this fitting parameter with a
+time-domain weighting function derived directly from the oscillator waveform.
+What I am easily trying to say in this section, is that Leeson's model assumes that all points in the period of a signal are equally sensitive to a certain noise peturbation. This is the assumption of time invariance. Hajimiri, whose mathematical knowledge is immense, has proposed a theory which I think would certainly become foundational for any oscillator. Hajimiri in his book "Low Noise Oscillators" breaks this assumption of time invariance, it's simply not an intuitive or obvious assumption. This means that different points have different sensitivity, this leads to much higher accuracy in the determination of oscillator dynamics and noise.
+ 
+ 
+
+
+\section{FM Modulation Demonstration}
+\subsection{Modulation Setup}
+
+To demonstrate FM modulation, the DC control voltage was replaced with a sinusoidal
+source:
+
+\begin{verbatim}
+SINE(2.55 0.05 1k)
+\end{verbatim}
+
+\noindent\textit{Listing 2: FM modulation source applied to the VCO control input.}
+
+This produces a carrier centered at $\sim 90\text{ kHz}$ with a DC offset of 2.55\,V,
+amplitude of $\pm 0.05\text{ V}$ (frequency deviation $\Delta f \approx K_{\text{VCO}} \times 0.05
+\approx \pm 9.2\text{ kHz}$), and modulating frequency $f_m = 1\text{ kHz}$. The modulation
+index is:
+
+
+
+\[
+\beta = \frac{\Delta f}{f_m}
+= \frac{9.2\text{ kHz}}{1\text{ kHz}}
+= 9.2
+\tag{15}
+\]
+
+
+
+For $\beta \approx 9.2$, the FM spectrum contains significant energy in sidebands up to
+order $n \approx 11$, reflected in the wide sideband structure of Figure~5.
+
+\subsection{Time Domain Results}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\linewidth]{photo4.png}
+    \caption{Time-domain waveform of the FM-modulated VCO output. The 1kHz modu
+lation envelope is visible as a sinusoidal variation in oscillation density. Carrier ≈ 90kHz, output swing 0–4V}
+    \label{fig:schematic}
+\end{figure}
+
+Figure~4 shows the FM-modulated output waveform. The periodic variation in carrier
+density---more cycles per unit time when $V_{\text{ctrl}}$ is high, fewer when low---is the
+characteristic time-domain signature of frequency modulation.
+
+\subsection{Frequency Domain Results}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\linewidth]{photo5.png}
+    \caption{FFT of the FM-modulated VCO output. The carrier at ∼90kHz is surrounded
+by FM sidebands consistent with β ≈ 9.2. The 1kHz modulating tone is visible on the
+left.}
+    \label{fig:schematic}
+\end{figure}
+
+Figure~5 shows the FFT of the FM-modulated output. The dominant carrier spike at
+$\sim 90\text{ kHz}$ is surrounded by the Bessel-function sideband structure characteristic
+of wideband FM.
+
+
+\section{Final Design Summary}
+
+Table~\ref{tab:final_vco_parameters} summarizes the complete VCO design parameters.
+
+\begin{table}[h]
+    \centering
+    \caption{Final VCO design parameters.}
+    \label{tab:final_vco_parameters}
+    \begin{tabular}{lc}
+        \hline
+        \textbf{Parameter} & \textbf{Value} \\
+        \hline
+        Topology & 3-stage differential ring oscillator \\
+        Transistors & 9 $\times$ 2N7000 NMOS (TO-92) \\
+        Supply voltage $V_{DD}$ & 5\,V \\
+        Load resistance $R$ & 2\,k\(\Omega\) (R1--R6) \\
+        Load capacitance $C$ & 2.2\,nF (C1--C6) \\
+        Control voltage range & 2.3\,V--2.8\,V \\
+        Frequency range & 75.4\,kHz--96.3\,kHz \\
+        Tuning range & $\approx$21\,kHz \\
+        VCO gain $K_{\text{VCO}}$ & 184\,kHz/V (near threshold) \\
+        Phase noise @ 1\,kHz offset & $-73$\,dBc/Hz \\
+        Phase noise @ 10\,kHz offset & $-98$\,dBc/Hz \\
+        Phase noise slope & $\approx -25$\,dB/decade \\
+        FM carrier frequency & $\approx 90$\,kHz \\
+        FM modulating frequency & 1\,kHz \\
+        FM modulation index $\beta$ & $\approx 9.2$ \\
+        \hline
+    \end{tabular}
+\end{table}
+\section{IC versus Discrete Implementation: A Parasitic Analysis}
+ 
+The discrete implementation of this report operates at $75$--$96\,\mathrm{kHz}$,
+far below the $2$--$4\,\mathrm{GHz}$ range of the companion IC design in
+180\,nm CMOS. This frequency gap reflects not a difference in topology---the
+three-stage differential ring architecture is identical in both cases---but the
+fundamentally different parasitic environments of discrete through-hole
+components and integrated circuit devices.
+ 
+\subsection{Discrete Implementation: Explicit Capacitors Dominate}
+ 
+In the discrete design, oscillation frequency is governed by the explicitly
+placed load capacitors $C = 2.2\,\mathrm{nF}$ and load resistors
+$R = 2\,\mathrm{k\Omega}$, supplemented by the parasitic capacitances of the
+2N7000 TO-92 package. From the ON~Semiconductor SPICE model, the relevant
+parasitic capacitances at each drain node are approximately:
+%
+\begin{equation}
+    C_{\mathrm{par,discrete}} \approx C_{gd} + C_{db} + C_{\mathrm{lead}}
+    \approx 5 + 15 + 10 = 30\,\mathrm{pF},
+\end{equation}
+%
+where $C_{\mathrm{lead}} \approx 10\,\mathrm{pF}$ accounts for TO-92 lead and
+breadboard interconnect capacitance. This parasitic total of $\sim\!30\,\mathrm{pF}$
+is negligible compared to the $2.2\,\mathrm{nF}$ explicit load, contributing
+a fractional frequency perturbation of less than $1.4\%$. The discrete oscillator
+frequency is therefore dominated entirely by the explicit $RC$ time constant,
+validating the design equations used throughout this report.
+ 
+\subsection{IC Implementation: Parasitics Set the Frequency}
+ 
+In a 180\,nm CMOS process, no explicit load capacitors are placed. The
+oscillation frequency is set entirely by the intrinsic device parasitics at
+each drain node. For a representative minimum-geometry NMOS transistor
+($L = 180\,\mathrm{nm}$, $W = 5\,\mu\mathrm{m}$), typical values from a
+180\,nm process design kit are:
+%
+\begin{align}
+    C_{gd} &\approx W \cdot C_{\mathrm{ov}} \approx 5\,\mu\mathrm{m}
+        \times 0.3\,\mathrm{fF/\mu m} = 1.5\,\mathrm{fF}, \\
+    C_{db} &\approx W \cdot C_j \approx 5\,\mu\mathrm{m}
+        \times 1\,\mathrm{fF/\mu m} = 5\,\mathrm{fF},
+\end{align}
+%
+giving a total drain-node capacitance of
+%
+\begin{equation}
+    C_{\mathrm{par,IC}} \approx C_{gd} + C_{db} + C_{\mathrm{wire}}
+    \approx 1.5 + 5 + 3 = 9.5\,\mathrm{fF} \approx 10\,\mathrm{fF},
+\end{equation}
+%
+where $C_{\mathrm{wire}} \approx 3\,\mathrm{fF}$ is estimated for compact
+local interconnect.
+ 
+\subsection{Frequency Scaling}
+ 
+Evaluating the oscillation frequency formula $f_0 = I_{\mathrm{tail}}/(2NC\Delta V)$
+for both implementations at comparable bias conditions
+($I_{\mathrm{tail}} \approx 1\,\mathrm{mA}$, $\Delta V \approx 0.5\,\mathrm{V}$,
+$N = 3$):
+%
+\begin{align}
+    f_{0,\,\mathrm{discrete}} &= \frac{1\,\mathrm{mA}}
+        {2 \times 3 \times 2.2\,\mathrm{nF} \times 0.5\,\mathrm{V}}
+        \approx 152\,\mathrm{kHz}, \\[4pt]
+    f_{0,\,\mathrm{IC}} &= \frac{1\,\mathrm{mA}}
+        {2 \times 3 \times 10\,\mathrm{fF} \times 0.5\,\mathrm{V}}
+        \approx 33\,\mathrm{GHz}.
+\end{align}
+%
+The ratio of frequencies equals the inverse ratio of total load capacitances:
+%
+\begin{equation}
+    \frac{f_{0,\,\mathrm{IC}}}{f_{0,\,\mathrm{discrete}}}
+    = \frac{C_{\mathrm{discrete}}}{C_{\mathrm{IC}}}
+    = \frac{2.2\,\mathrm{nF}}{10\,\mathrm{fF}} = 220{,}000.
+\end{equation}
+%
+The $\sim\!10^5$ frequency difference between the two implementations is
+therefore attributable entirely to the $\sim\!10^5$ ratio of load
+capacitances---not to any change in topology, device physics, or supply voltage.
+In the IC design, deliberately placed varactor capacitances reduce the
+parasitic-limited $\sim\!33\,\mathrm{GHz}$ ceiling to the target $2$--$4\,\mathrm{GHz}$
+range, providing controlled design margin and enabling voltage-controlled
+frequency tuning.
+ 
+\subsection{Design Inversion: Discrete versus Integrated}
+ 
+The parasitic analysis reveals a fundamental inversion in the design methodology:
+ 
+\begin{itemize}
+    \item In the \textbf{discrete implementation}, explicit capacitors
+    \emph{set} the operating frequency; parasitics are negligible corrections
+    ($< 2\%$ frequency error).
+ 
+    \item In the \textbf{IC implementation}, parasitics \emph{determine} the
+    upper frequency limit; intentional capacitors (varactors, load capacitors)
+    are added to \emph{reduce} the frequency to the desired operating point and
+    provide tunability.
+\end{itemize}
+ 
+Additionally, device matching in the integrated implementation is
+fundamentally superior: lithographically defined transistors of identical
+geometry have matched $C_{gs}$, $C_{gd}$, and $C_{db}$ to within fractions of
+a percent, preserving the differential symmetry that the ring oscillator requires
+for CMRR and phase noise performance. In the discrete implementation, component
+tolerances of $5$--$10\%$ on both $R$ and $C$ introduce branch asymmetries,
+contributing to the measured phase noise floor and any observed spurious
+frequency content.
+
+\paragraph{Note:} This is remarkable. This is intuitively comparable to the concept of intrinsic gain of an amplifier. An IC ring oscillator without explicit load capacitors works at incredibly high frequencies due low parasitics. We can think of this as the intrinsic maximum frequency of an IC ring oscillator. Any artifact is basically lowering the frequency but it can never go above that intrinsic ceiling set by transistor parameters and interconnect (interconnect is mainly a layout topic, which is mainly why this topic is optional even though the parasitics could be understood easily). What I mean by intrinsic gain is; suppose I have a common source amplifier with resistive load. Theoretically, if I make $R_D$ infinite (open circuit), gain is infinite. But is this logical? No. There is no bias current $I_D = 0$, supply is disconnected from the amplifier. Therefore there is a ceiling for gain, something we can never go above, $A_{v,max} = g_mr_o$. The common gate amplifier, which is taught to have low gain and therefore to be avoided, actually has a much higher $A_{v,max}$ than other amplifier topologies. This potential of the common gate is achieved by cascoding. Cascoding achieves high gain because it makes this underrated amplifier reach it's potential and at the same time achieve better frequency response.
+
+\section{Conclusion}
+
+A three-stage differential ring oscillator VCO was successfully designed and simulated
+using nine discrete 2N7000 MOSFET transistors. The differential topology provides
+common-mode noise rejection and a direct relationship between tail current and oscillation
+frequency, enabling voltage-controlled operation through the gate bias of the tail current
+sources.
+
+Through systematic component optimization, a tuning range of approximately 21\,kHz
+(75.4--96.3\,kHz) was achieved. The nonlinear tuning curve, with most of the frequency
+variation occurring near the threshold voltage, is consistent with the quadratic dependence
+of tail current on overdrive voltage predicted by the MOSFET square-law model. The
+VCO gain in the most sensitive region was 184\,kHz/V.
+
+Phase noise was estimated at $L(1\text{ kHz}) \approx -73\text{ dBc/Hz}$ and
+$L(10\text{ kHz}) \approx -98\text{ dBc/Hz}$, with a roll-off of $\approx -25\text{ dB/decade}$
+consistent with Leeson’s model. These values confirm the fundamental phase noise
+limitation of ring oscillator topologies relative to LC alternatives, attributable to the
+absence of a high-$Q$ resonating element.
+
+FM modulation was demonstrated with a 1\,kHz modulating signal, yielding
+$\beta \approx 9.2$ and clearly visible Bessel-function sideband structure. The design is
+ready for physical implementation on a breadboard using standard through-hole
+components.
+\subsection{KVCO Nonlinearity and the Saturation Regime (Optional) }
+ 
+The tuning curve of Table~3 exhibits a strongly nonlinear characteristic: the
+oscillation frequency rises sharply from $75.4\,\mathrm{kHz}$ to
+$93.8\,\mathrm{kHz}$ over the first $100\,\mathrm{mV}$ of control voltage
+($V_{\mathrm{ctrl}} = 2.3$ to $2.4\,\mathrm{V}$), then increases by only
+a further $2.5\,\mathrm{kHz}$ over the remaining $400\,\mathrm{mV}$ of the
+tuning window. This behaviour is a consequence of the quadratic tail current
+dependence of Equation~(6), compounded by a transition in the dominant delay
+mechanism.
+ 
+\paragraph{Quadratic regime (near threshold).}
+Close to threshold ($V_{\mathrm{ctrl}} \approx V_{TO}$), the tail current is
+small, the load capacitors charge and discharge slowly, and the oscillation
+frequency is highly sensitive to incremental changes in $V_{\mathrm{ctrl}}$.
+This is where $K_{VCO}$ is maximised at $184\,\mathrm{kHz/V}$.
+ 
+\paragraph{RC-dominated saturation (above threshold).}
+As $V_{\mathrm{ctrl}}$ increases well beyond $V_{TO}$, the tail current becomes
+large enough to charge $C$ to the full swing $\Delta V$ in a time
+$t_d = C\Delta V / I_{\mathrm{tail}}$ that is much shorter than the RC time
+constant $\tau = RC$. The oscillation period transitions from being limited by
+the available tail current (Equation~(4)) toward the RC-discharge limit of
+Equation~(3): $f_0 \approx 1/(2NRC\ln 2)$. Since $R$ and $C$ are fixed, this
+imposes a frequency ceiling independent of $V_{\mathrm{ctrl}}$, producing
+the saturation behaviour observed above $2.4\,\mathrm{V}$ in Table~3. The
+crossover between the two regimes occurs when
+%
+\begin{equation}
+    \frac{I_{\mathrm{tail}}}{C \Delta V} \approx \frac{1}{RC}
+    \quad \Longrightarrow \quad
+    I_{\mathrm{tail}} \approx \frac{\Delta V}{R},
+\end{equation}
+%
+i.e., when the tail current equals the load resistor's steady-state current at
+full output swing. This condition is reached near $V_{\mathrm{ctrl}} \approx 2.4\,\mathrm{V}$
+in this design, consistent with the observed onset of saturation.
+ 
+\paragraph{KVCO linearisation in the IC design (varactor dual-knob).}
+In the companion IC design, a second frequency control input was implemented via
+varactor diodes whose junction capacitance
+$C_j(V) = C_{j0}/\sqrt{1 - V_D/\phi_0}$
+varies with reverse bias.
+The quadratic $I_{\mathrm{tail}}(V_{\mathrm{ctrl}})$ dependence produces a
+$K_{VCO}$ characteristic that increases with $V_{\mathrm{ctrl}}$ (convex
+upward curvature), while the inverse-square-root varactor capacitance dependence
+produces a $K_{VCO}$ contribution that decreases with the varactor control voltage
+(concave, downward curvature). Over the $2$--$4\,\mathrm{GHz}$ tuning range,
+the two nonlinearities partially cancel, yielding a combined tuning curve that
+appears approximately linear despite each individual mechanism being nonlinear.
+This linearisation is a consequence of the opposing curvatures of the
+square-law MOSFET and the inverse-square-root varactor, and it represents a
+fortuitous but physically explicable interaction that can, in principle, be
+exploited intentionally at the design stage.
+The person who is responsible for partially firing up this thought, is Prof. Razavi.
+
+
+
+\end{document}
