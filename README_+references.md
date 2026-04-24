@@ -1,0 +1,13 @@
+# A-voltage-controlled-ring-oscillator-implemented-differentially
+This project is on the topic of ring oscillators, specifically voltage controlled ring oscillators. The topology is very interesting (differential topology), and presents some advantages over the typical CMOS inverter ring, even though they behave similarly on a lot of things (e.g Violation of classic Barkhausen criterion).
+The project was made independently and took 4 months, but the report might seem weird. This is because it was submitted for a course which required a discrete implementation. However, this actually exposes a very beautiful fact of the ring topology, is that it's scalable. Behzad Razavi himself writes that the ring oscillator was made using vacuum tubes in ~1920 (according to my memory). Also, the differential amplifier based ring can have another control terminal, that of the current source at the bottom. A classical CMOS inverter ring oscillator or a single ended ring oscillator (NMOS inverter with resistive load) usually have one control knob.
+The differential amplifier topology is not a completely new innovation. Razavi already addresses it but he addresses it in an inredibly complex way (40nm transistor instead of 180nm, FOM calculation etc, phase noise improvement, quadrature oscillator etc.). I hope I could read Razavi's paper now and fully understand it.
+
+Here are some incredibly helpful resources that have benefitted me on this remarkable journey:
+1- Hajimiri's lecture series at Caltech titled "New Analog Circuit Design". It was very beneficial in terms of understanding the physics of varactors and differential pair analysis. There is also a lecture on the ISF phase noise model which I hadn't covered.
+
+2- "Design of Analog CMOS ICs" by Behzad Razavi, again another great book in the field of analog circuit design. One can also check Razavi's paper on Ring oscillators "https://www.seas.ucla.edu/brweb/papers/Journals/BR_SSCM_4_2019.pdf" and some segments of a more advanced book by him "RF microelectronics"
+
+3- "RF CMOS ICs" by Thomas Lee. This book helped me understand the violation of the classical barkhausen criterion, and the inherent non-linearity of the ring oscillator. It also introduced me to the essential frequency equation in terms of propagation delay.
+
+4- "https://electronics.stackexchange.com/questions/672700/ring-oscillator" This phenomenal electrical stack exchange post also helped me understand why a single CMOS inverter in a feedback loop fails to oscillate, even though it achieves essentially the same phase shift as any odd number ring oscillator. Some users also proposed an interesting inductive feedback, which might be worth exploring.
